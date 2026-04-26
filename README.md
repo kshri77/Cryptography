@@ -201,7 +201,7 @@ nslookup malicious-site.com
 
 ---
 
-# 🚀 Tools Used
+Tools Used
 
 * Snort
 * Nmap
