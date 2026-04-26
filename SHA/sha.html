@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SHA-256 Full Step-by-Step</title>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; background: #f0f0f0; padding: 20px; }
+        .box { max-width: 1000px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        textarea { width: 100%; height: 50px; margin-bottom: 10px; }
+        button { width: 100%; padding: 12px; background: #28a745; color: white; border: none; font-weight: bold; cursor: pointer; }
+        pre { background: #1e1e1e; color: #dcdcdc; padding: 15px; height: 600px; overflow-y: auto; font-size: 12px; border-radius: 4px; }
+        .section { color: #569cd6; font-weight: bold; margin-top: 10px; display: block; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>SHA-256: All 64 Intermediate Rounds</h2>
+    <textarea id="input">abc</textarea>
+    <button onclick="run()">Compute & Show All Steps</button>
+    <pre id="output"></pre>
+</div>
+
+<script>
+const MASK = 0xFFFFFFFF;
+const hex = (n) => (n >>> 0).toString(16).padStart(8, '0');
+
+function rotr(x, n) { return ((x >>> n) | (x << (32 - n))) & MASK; }
+
+const K = [
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+];
+
+function run() {
+    let out = "";
+    const log = (m) => out += m + "\n";
+    const logS = (m) => out += `<span class="section">${m}</span>\n`;
+
+    let msg = document.getElementById("input").value;
+    let data = Array.from(new TextEncoder().encode(msg));
+
+    let h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+
+    // Padding Logic
+    let bitLen = data.length * 8;
+    data.push(0x80);
+    while (data.length % 64 !== 56) data.push(0);
+    let lenArr = new ArrayBuffer(8);
+    let view = new DataView(lenArr);
+    view.setBigUint64(0, BigInt(bitLen));
+    data = data.concat(Array.from(new Uint8Array(lenArr)));
+
+    logS("--- STEP 1: PADDING ---");
+    log("Padded Length: " + data.length + " bytes");
+
+    for (let chunk = 0; chunk < data.length; chunk += 64) {
+        logS(`\n--- PROCESSING BLOCK ${chunk/64} ---`);
+        
+        let w = new Array(64).fill(0);
+        for (let i = 0; i < 16; i++) {
+            w[i] = (data[chunk + i*4] << 24) | (data[chunk + i*4+1] << 16) | (data[chunk + i*4+2] << 8) | data[chunk + i*4+3];
+        }
+
+        logS("Message Schedule Expansion (W0-W63):");
+        for (let i = 16; i < 64; i++) {
+            let s0 = rotr(w[i-15], 7) ^ rotr(w[i-15], 18) ^ (w[i-15] >>> 3);
+            let s1 = rotr(w[i-2], 17) ^ rotr(w[i-2], 19) ^ (w[i-2] >>> 10);
+            w[i] = (w[i-16] + s0 + w[i-7] + s1) & MASK;
+        }
+        w.forEach((val, index) => log(`W[${index.toString().padStart(2,'0')}]: ${hex(val)}`));
+
+        let [a, b, c, d, e, f, g, hh] = h;
+
+        logS("\n--- STARTING 64 ROUNDS ---");
+        log("Initial State: " + h.map(hex).join(' '));
+
+        for (let i = 0; i < 64; i++) {
+            let S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+            let ch = (e & f) ^ ((~e) & g);
+            let temp1 = (hh + S1 + ch + K[i] + w[i]) & MASK;
+
+            let S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+            let maj = (a & b) ^ (a & c) ^ (b & c);
+            let temp2 = (S0 + maj) & MASK;
+
+            hh = g; g = f; f = e;
+            e = (d + temp1) & MASK;
+            d = c; c = b; b = a;
+            a = (temp1 + temp2) & MASK;
+
+            log(`R${i.toString().padStart(2,'0')}: a:${hex(a)} b:${hex(b)} c:${hex(c)} d:${hex(d)} e:${hex(e)} f:${hex(f)} g:${hex(g)} h:${hex(hh)}`);
+        }
+
+        logS("\n--- FINAL BLOCK ADDITION ---");
+        let oldH = [...h];
+        h[0] = (h[0] + a) & MASK; h[1] = (h[1] + b) & MASK;
+        h[2] = (h[2] + c) & MASK; h[3] = (h[3] + d) & MASK;
+        h[4] = (h[4] + e) & MASK; h[5] = (h[5] + f) & MASK;
+        h[6] = (h[6] + g) & MASK; h[7] = (h[7] + hh) & MASK;
+
+        h.forEach((val, idx) => log(`H${idx}: ${hex(oldH[idx])} + ... -> ${hex(val)}`));
+    }
+
+    logS("\n--- FINAL HASH ---");
+    log(h.map(hex).join(''));
+
+    document.getElementById("output").innerHTML = out;
+}
+</script>
+
+</body>
+</html>

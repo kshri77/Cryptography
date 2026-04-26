@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>RSA Algorithm</title>
+
+<style>
+
+body{
+font-family:Arial;
+background:#f4f6f9;
+padding:20px;
+}
+
+.box{
+background:white;
+padding:15px;
+margin:10px 0;
+border-radius:8px;
+box-shadow:0 0 5px rgba(0,0,0,0.1);
+}
+
+input{
+padding:5px;
+margin:5px;
+width:80px;
+}
+
+button{
+padding:8px 15px;
+cursor:pointer;
+}
+
+.result{
+font-weight:bold;
+color:darkblue;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h2> RSA Algorithm </h2>
+
+<div class="box">
+<h3>Prime Numbers</h3>
+p: <input type="number" id="p" value="11"><br>
+q: <input type="number" id="q" value="13">
+</div>
+
+<div class="box">
+<h3>Public Exponent</h3>
+e: <input type="number" id="e" value="7">
+</div>
+
+<div class="box">
+<h3>Message</h3>
+m: <input type="number" id="m" value="9">
+</div>
+
+<button onclick="runRSA()">Run RSA</button>
+
+<div class="box" id="output"></div>
+
+<script>
+
+async function runRSA(){
+
+let p=document.getElementById("p").value
+let q=document.getElementById("q").value
+let e=document.getElementById("e").value
+let m=document.getElementById("m").value
+
+let response=await fetch("/rsa",{
+
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({p,q,e,m})
+
+})
+
+let data=await response.json()
+
+let html=""
+
+html+="<h3>Step 1: n</h3>"
+html+="n = "+data.n+"<br><br>"
+
+html+="<h3>Step 2: φ(n)</h3>"
+html+="φ(n) = "+data.phi+"<br><br>"
+
+html+="<h3>Step 3: gcd(e,φ(n))</h3>"
+data.gcdSteps.forEach(s=>html+=s+"<br>")
+html+="gcd = "+data.gcdValue+"<br><br>"
+
+html+="<h3>Step 4: Private Key</h3>"
+data.inverseSteps.forEach(s=>html+=s+"<br>")
+html+="d = "+data.d+"<br><br>"
+
+html+="<h3>Step 5: Encryption</h3>"
+data.encryptSteps.forEach(s=>html+=s+"<br>")
+html+="Cipher = "+data.cipher+"<br><br>"
+
+html+="<h3>Step 6: Decryption</h3>"
+data.decryptSteps.forEach(s=>html+=s+"<br>")
+html+="Message = "+data.decrypted+"<br><br>"
+
+html+=`<div class="result">Original = ${m} | Cipher = ${data.cipher} | Decrypted = ${data.decrypted}</div>`
+
+document.getElementById("output").innerHTML=html
+
+}
+
+</script>
+
+</body>
+</html>

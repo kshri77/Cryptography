@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AES CMAC - No Padding</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        h2 { color: #007acc; border-bottom: 2px solid #007acc; padding-bottom: 10px; }
+        .input-group { margin-bottom: 15px; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; }
+        textarea, input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-family: monospace;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #007acc;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover { background: #005f99; }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            height: 450px;
+            overflow-y: auto;
+            border-left: 5px solid #007acc;
+            font-size: 13px;
+            white-space: pre-wrap;
+        }
+        .highlight { color: #d9534f; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>AES CMAC Step-by-Step (No Padding)</h2>
+    
+    <div class="input-group">
+        <label for="msg">Message (UTF-8):</label>
+        <textarea id="msg">hello world 1234</textarea>
+    </div>
+
+    <div class="input-group">
+        <label for="key">Key (16 bytes):</label>
+        <input id="key" value="abcdefghijklmnop">
+    </div>
+
+    <button onclick="calculateCMAC()">Calculate CMAC</button>
+
+    <div class="input-group" style="margin-top: 20px;">
+        <label>Intermediary Steps & Result:</label>
+        <pre id="out">Output will appear here...</pre>
+    </div>
+</div>
+
+<script>
+/** 
+ * Helper functions for bitwise operations and logging
+ */
+const hex = (arr) => Array.from(arr).map(x => x.toString(16).padStart(2, '0')).join('');
+const xor = (a, b) => a.map((x, i) => x ^ b[i]);
+
+// Dummy AES block logic matching your specific transformation requirements
+function aes_block(block, key, log) {
+    log("\n--- ENTERING AES BLOCK ---");
+    log("Input: " + hex(block));
+
+    let state = xor(block, key);
+    log("Initial XOR with Key (AddRoundKey): " + hex(state));
+
+    // Simplified rounds as per original demo logic
+    for(let i = 0; i < 3; i++) {
+        state = state.map(x => (x ^ 0x63) & 0xFF);
+        log(`Round ${i+1} Output: ` + hex(state));
+    }
+    return state;
+}
+
+function leftShift(arr) {
+    let res = new Array(16).fill(0);
+    let carry = 0;
+    for(let i = 15; i >= 0; i--) {
+        res[i] = ((arr[i] << 1) & 0xFF) | carry;
+        carry = (arr[i] >> 7) & 1;
+    }
+    return res;
+}
+
+function calculateCMAC() {
+    let output = "";
+    const log = (m) => output += m + "\n";
+    
+    const msgVal = document.getElementById("msg").value;
+    const keyVal = document.getElementById("key").value;
+
+    let data = Array.from(new TextEncoder().encode(msgVal));
+    let key = Array.from(new TextEncoder().encode(keyVal).slice(0, 16));
+    while(key.length < 16) key.push(0);
+
+    log("Message Hex: " + hex(data));
+    log("Key Hex: " + hex(key));
+
+    // --- 1. SUBKEY GENERATION ---
+    log("\n[STEP 1] Generating Subkeys");
+    let L = aes_block(new Array(16).fill(0), key, log);
+    log("L (AES encryption of zero): " + hex(L));
+
+    let K1 = leftShift(L);
+    if(L[0] & 0x80) {
+        K1[15] ^= 0x87; // Polynomial constant for CMAC
+        log("MSB of L was 1, XORed shifted L with 0x87");
+    }
+    log("K1: " + hex(K1));
+
+    // --- 2. BLOCK PREPARATION (NO PADDING) ---
+    // CMAC without padding requires 16-byte boundaries. 
+    // If the message isn't a multiple, we zero-fill to create complete blocks.
+    if (data.length === 0) data = new Array(16).fill(0);
+    while (data.length % 16 !== 0) data.push(0);
+
+    let blocks = [];
+    for(let i = 0; i < data.length; i += 16) {
+        blocks.push(data.slice(i, i + 16));
+    }
+    log(`\n[STEP 2] Message divided into ${blocks.length} block(s).`);
+
+    // --- 3. PROCESSING ---
+    let X = new Array(16).fill(0);
+    
+    // Process all intermediate blocks except the last one
+    for(let i = 0; i < blocks.length - 1; i++) {
+        log(`\nProcessing Block ${i}: ` + hex(blocks[i]));
+        X = aes_block(xor(X, blocks[i]), key, log);
+        log("Current Intermediate State (X): " + hex(X));
+    }
+
+    // --- 4. FINAL BLOCK & K1 XOR ---
+    log("\n[STEP 3] Final Block Processing (Always using K1)");
+    let lastBlock = blocks[blocks.length - 1];
+    log("Last Block Content: " + hex(lastBlock));
+    
+    // Core CMAC logic for "no padding": Tag = AES_Encrypt(X ^ LastBlock ^ K1)
+    let M_last = xor(xor(X, lastBlock), K1);
+    log("Final XOR result (X ^ LastBlock ^ K1): " + hex(M_last));
+
+    let T = aes_block(M_last, key, log);
+
+    log("\n==============================");
+    log("FINAL CMAC TAG: " + hex(T));
+    log("==============================");
+
+    document.getElementById("out").textContent = output;
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Diffie-Hellman Key Exchange</title>
+<style>
+
+body{
+font-family:Arial;
+background:#f4f6f9;
+padding:20px;
+}
+
+.box{
+background:white;
+padding:15px;
+margin:10px 0;
+border-radius:8px;
+box-shadow:0 0 5px rgba(0,0,0,0.1);
+}
+
+input{
+padding:5px;
+margin:5px;
+width:80px;
+}
+
+button{
+padding:8px 15px;
+cursor:pointer;
+}
+
+.result{
+font-weight:bold;
+color:darkblue;
+}
+
+</style>
+</head>
+
+<body>
+
+<h2>🔐 Diffie-Hellman Key Exchange (With Steps)</h2>
+
+<div class="box">
+<h3>Public Values</h3>
+Prime (p): <input type="number" id="p" value="23"><br>
+Primitive Root (g): <input type="number" id="g" value="5">
+</div>
+
+<div class="box">
+<h3>Private Keys</h3>
+Alice (a): <input type="number" id="a" value="6"><br>
+Bob (b): <input type="number" id="b" value="15">
+</div>
+
+<button onclick="calculateDH()">Calculate</button>
+
+<div class="box" id="output"></div>
+
+<script>
+
+async function calculateDH(){
+
+let p=document.getElementById("p").value
+let g=document.getElementById("g").value
+let a=document.getElementById("a").value
+let b=document.getElementById("b").value
+
+let response=await fetch("/diffie",{
+
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({p,g,a,b})
+
+})
+
+let data=await response.json()
+
+let html=""
+
+html+="<h3>Step 1: Public Keys</h3>"
+html+="Alice Public Key (A) = "+data.A+"<br>"
+html+="Bob Public Key (B) = "+data.B+"<br><br>"
+
+html+="<h4>Alice Public Key Calculation</h4>"
+data.alicePublicSteps.forEach(step=>html+=step+"<br>")
+
+html+="<br><h4>Bob Public Key Calculation</h4>"
+data.bobPublicSteps.forEach(step=>html+=step+"<br>")
+
+html+="<br><h3>Step 2: Shared Secret</h3>"
+
+html+="<h4>Alice Secret Calculation</h4>"
+data.aliceSecretSteps.forEach(step=>html+=step+"<br>")
+
+html+="<br><h4>Bob Secret Calculation</h4>"
+data.bobSecretSteps.forEach(step=>html+=step+"<br>")
+
+html+=`<br><div class="result">Shared Secret Key = ${data.secretAlice}</div>`
+
+document.getElementById("output").innerHTML=html
+
+}
+
+</script>
+
+</body>
+</html>
